@@ -2,8 +2,8 @@
 
 # Workload 테스트 스크립트 - adaptive policy의 정책 전환을 유도
 
-CGROUP_PATH="/sys/fs/cgroup/adaptive_test"
-WATCH_DIR="/mydata/leveldb_db"
+CGROUP_PATH="${1:-/sys/fs/cgroup/adaptive_test}"
+WATCH_DIR="${2:-/mydata/adaptive_test_data}"
 
 echo "=================================="
 echo "Adaptive Policy Workload Test"
