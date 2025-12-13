@@ -310,7 +310,7 @@ void BPF_STRUCT_OPS(adaptive_folio_evicted, struct folio *folio)
 }
 
 void BPF_STRUCT_OPS(adaptive_evict_folios,
-		    struct cache_ext_eviction_ctx *ctx,
+		    struct cache_ext_eviction_ctx *eviction_ctx,
 		    struct mem_cgroup *memcg)
 {
 	int ret = 0;
@@ -324,15 +324,15 @@ void BPF_STRUCT_OPS(adaptive_evict_folios,
 	switch (current_policy) {
 	case POLICY_MRU:
 		ret = bpf_cache_ext_list_iterate(memcg, mru_list,
-						 mru_iterate_fn, ctx);
+						 mru_iterate_fn, eviction_ctx);
 		break;
 	case POLICY_FIFO:
 		ret = bpf_cache_ext_list_iterate(memcg, fifo_list,
-						 fifo_iterate_fn, ctx);
+						 fifo_iterate_fn, eviction_ctx);
 		break;
 	case POLICY_LRU:
 		ret = bpf_cache_ext_list_iterate(memcg, lru_list,
-						 lru_iterate_fn, ctx);
+						 lru_iterate_fn, eviction_ctx);
 		break;
 	}
 
