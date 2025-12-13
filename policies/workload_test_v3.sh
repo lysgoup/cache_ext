@@ -2,8 +2,9 @@
 
 # Workload 테스트 스크립트 v3 - adaptive policy v3의 정책 전환을 유도
 
-CGROUP_PATH="/sys/fs/cgroup/adaptive_v3_test"
-WATCH_DIR="/mydata/leveldb_db"
+# 커맨드라인 인자로 경로 설정 가능
+CGROUP_PATH="${1:-/sys/fs/cgroup/adaptive_v3_test}"
+WATCH_DIR="${2:-/mydata/adaptive_test_data}"
 
 echo "=================================="
 echo "Adaptive Policy v3 Workload Test"

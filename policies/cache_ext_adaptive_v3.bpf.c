@@ -317,7 +317,11 @@ static void check_and_switch_policy(void)
 	if (new_policy == current_policy)
 		return;
 
-	stats[current_policy].time_active = timestamp - stats[current_policy].time_started;
+	// Bounds check for verifier
+	u32 old_policy = current_policy;
+	if (old_policy < 5) {
+		stats[old_policy].time_active = timestamp - stats[old_policy].time_started;
+	}
 
 	event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
 	if (event) {
@@ -331,7 +335,14 @@ static void check_and_switch_policy(void)
 		event->avg_hits_per_page = calculate_avg_hits_per_page();
 		event->avg_reuse_distance = calculate_avg_reuse_distance();
 		event->dirty_ratio = calculate_dirty_ratio();
-		event->old_policy_hit_rate = calculate_policy_hit_rate(&stats[current_policy]);
+
+		// Bounds check for verifier
+		if (old_policy < 5) {
+			event->old_policy_hit_rate = calculate_policy_hit_rate(&stats[old_policy]);
+		} else {
+			event->old_policy_hit_rate = 0;
+		}
+
 		event->working_set_size = working_set_size;
 		event->working_set_ratio = calculate_working_set_ratio();
 
@@ -345,7 +356,10 @@ static void check_and_switch_policy(void)
 	last_policy_switch_time = timestamp;
 	policy_switch_count++;
 
-	stats[new_policy].time_started = timestamp;
+	// Bounds check for verifier
+	if (new_policy < 5) {
+		stats[new_policy].time_started = timestamp;
+	}
 
 	total_accesses = 0;
 	cache_hits = 0;
@@ -502,7 +516,11 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(adaptive_v3_init, struct mem_cgroup *memcg)
 
 	current_policy = POLICY_MRU;
 	last_policy_switch_time = 0;
-	stats[POLICY_MRU].time_started = 0;
+
+	// Initialize stats for first policy
+	if (POLICY_MRU < 5) {
+		stats[POLICY_MRU].time_started = 0;
+	}
 
 	bpf_printk("Adaptive v3 initialized: MRU, FIFO, LRU, S3-FIFO, LHD\n");
 	return 0;
@@ -653,7 +671,12 @@ void BPF_STRUCT_OPS(adaptive_v3_folio_evicted, struct folio *folio)
 	bpf_map_delete_elem(&folio_metadata_map, &key);
 
 	__sync_fetch_and_add(&total_evictions, 1);
-	__sync_fetch_and_add(&stats[current_policy].evictions, 1);
+
+	// Bounds check for verifier
+	u32 policy = current_policy;
+	if (policy < 5) {
+		__sync_fetch_and_add(&stats[policy].evictions, 1);
+	}
 }
 
 void BPF_STRUCT_OPS(adaptive_v3_evict_folios,
