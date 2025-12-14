@@ -41,6 +41,18 @@ struct policy_switch_event {
 	unsigned long long old_policy_hit_rate;
 };
 
+// 메트릭 스냅샷 이벤트
+struct metric_snapshot_event {
+	unsigned long long total_accesses;
+	unsigned long long hit_rate;
+	unsigned long long one_time_ratio;
+	unsigned long long sequential_ratio;
+	unsigned long long avg_hits_per_page;
+	unsigned long long current_policy;
+	unsigned long long pages_evicted;
+	unsigned long long timestamp;
+};
+
 char *USAGE =
 	"Usage: ./cache_ext_adaptive_v2_debug --watch_dir <dir> --cgroup_path <path>\n"
 	"\n"
@@ -87,46 +99,64 @@ static void sig_handler(int sig)
 
 static int handle_event(void *ctx, void *data, size_t data_sz)
 {
-	const struct policy_switch_event *e = data;
+	if (data_sz == sizeof(struct policy_switch_event)) {
+		// Policy switch event
+		const struct policy_switch_event *e = data;
 
-	if (e->old_policy >= 3 || e->new_policy >= 3) {
-		fprintf(stderr, "Invalid policy ID in event\n");
-		return 0;
+		if (e->old_policy >= 3 || e->new_policy >= 3) {
+			fprintf(stderr, "Invalid policy ID in event\n");
+			return 0;
+		}
+
+		printf("\n");
+		printf("========================================\n");
+		printf("POLICY SWITCH DETECTED!\n");
+		printf("========================================\n");
+		printf("  Time:                %llu\n", e->timestamp);
+		printf("  Old Policy:          %s\n", policy_names[e->old_policy]);
+		printf("  New Policy:          %s\n", policy_names[e->new_policy]);
+		printf("\n");
+		printf("Performance Metrics:\n");
+		printf("  Hit Rate:            %llu%%\n", e->hit_rate);
+		printf("  Old Policy Hit Rate: %llu%%\n", e->old_policy_hit_rate);
+		printf("  Total Accesses:      %llu\n", e->total_accesses);
+		printf("\n");
+		printf("Workload Characteristics:\n");
+		printf("  One-time Ratio:      %llu%%\n", e->one_time_ratio);
+		printf("  Sequential Ratio:    %llu%%\n", e->sequential_ratio);
+		printf("  Avg Hits/Page:       %llu\n", e->avg_hits_per_page);
+		printf("  Avg Reuse Distance:  %llu\n", e->avg_reuse_distance);
+		printf("  Dirty Page Ratio:    %llu%%\n", e->dirty_ratio);
+		printf("========================================\n");
+
+		// 정책 선택 이유 추론
+		printf("\nSwitch Reason:\n");
+		if (e->sequential_ratio > 30) {
+			printf("  → High sequential access detected\n");
+		} else if (e->one_time_ratio > 20 && e->avg_hits_per_page < 2) {
+			printf("  → Many one-time accesses (scan workload)\n");
+		} else if (e->avg_hits_per_page > 1) {
+			printf("  → Hot working set with high reuse\n");
+		} else if (e->hit_rate < 30) {
+			printf("  → Low hit rate, trying different policy\n");
+		}
+		printf("\n");
+
+	} else if (data_sz == sizeof(struct metric_snapshot_event)) {
+		// Metric snapshot event - print current metrics
+		const struct metric_snapshot_event *m = data;
+
+		if (m->current_policy >= 3) {
+			fprintf(stderr, "Invalid policy ID in metric event\n");
+			return 0;
+		}
+
+		printf("[METRICS] accesses=%llu | hit_rate=%llu%% | one_time=%llu%% | sequential=%llu%% | avg_hits=%llu | policy=%s | evicted=%llu\n",
+		       m->total_accesses, m->hit_rate, m->one_time_ratio,
+		       m->sequential_ratio, m->avg_hits_per_page,
+		       policy_names[m->current_policy], m->pages_evicted);
+		fflush(stdout);
 	}
-
-	printf("\n");
-	printf("========================================\n");
-	printf("POLICY SWITCH DETECTED!\n");
-	printf("========================================\n");
-	printf("  Time:                %llu\n", e->timestamp);
-	printf("  Old Policy:          %s\n", policy_names[e->old_policy]);
-	printf("  New Policy:          %s\n", policy_names[e->new_policy]);
-	printf("\n");
-	printf("Performance Metrics:\n");
-	printf("  Hit Rate:            %llu%%\n", e->hit_rate);
-	printf("  Old Policy Hit Rate: %llu%%\n", e->old_policy_hit_rate);
-	printf("  Total Accesses:      %llu\n", e->total_accesses);
-	printf("\n");
-	printf("Workload Characteristics:\n");
-	printf("  One-time Ratio:      %llu%%\n", e->one_time_ratio);
-	printf("  Sequential Ratio:    %llu%%\n", e->sequential_ratio);
-	printf("  Avg Hits/Page:       %llu\n", e->avg_hits_per_page);
-	printf("  Avg Reuse Distance:  %llu\n", e->avg_reuse_distance);
-	printf("  Dirty Page Ratio:    %llu%%\n", e->dirty_ratio);
-	printf("========================================\n");
-
-	// 정책 선택 이유 추론
-	printf("\nSwitch Reason:\n");
-	if (e->sequential_ratio > 30) {
-		printf("  → High sequential access detected\n");
-	} else if (e->one_time_ratio > 20 && e->avg_hits_per_page < 2) {
-		printf("  → Many one-time accesses (scan workload)\n");
-	} else if (e->avg_hits_per_page > 1) {
-		printf("  → Hot working set with high reuse\n");
-	} else if (e->hit_rate < 30) {
-		printf("  → Low hit rate, trying different policy\n");
-	}
-	printf("\n");
 
 	return 0;
 }

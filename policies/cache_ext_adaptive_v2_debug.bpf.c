@@ -114,6 +114,18 @@ struct policy_switch_event {
 	u64 old_policy_hit_rate;
 };
 
+// ===== 메트릭 스냅샷 이벤트 =====
+struct metric_snapshot_event {
+	u64 total_accesses;
+	u64 hit_rate;
+	u64 one_time_ratio;
+	u64 sequential_ratio;
+	u64 avg_hits_per_page;
+	u64 current_policy;
+	u64 pages_evicted;
+	u64 timestamp;
+};
+
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 8192);
@@ -589,15 +601,21 @@ void BPF_STRUCT_OPS(adaptive_v2_debug_evict_folios,
 {
 	int ret = 0;
 
-	// 매번 메트릭 출력 (DEBUG) - 10번마다
+	// 주기적으로 메트릭 스냅샷 전송 (10번마다)
 	if ((total_accesses % 10) == 0 && total_accesses > 0) {
-		u64 hit_rate = calculate_hit_rate();
-		u64 one_time = calculate_one_time_ratio();
-		u64 seq = calculate_sequential_ratio();
-		u64 avg_hits = calculate_avg_hits_per_page();
-		
-		bpf_printk("DEBUG METRICS [accesses=%llu]: hit_rate=%llu%% one_time=%llu%% seq=%llu%% avg_hits=%llu policy=%d\n",
-			   total_accesses, hit_rate, one_time, seq, avg_hits, current_policy);
+		struct metric_snapshot_event *event;
+		event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
+		if (event) {
+			event->total_accesses = total_accesses;
+			event->hit_rate = calculate_hit_rate();
+			event->one_time_ratio = calculate_one_time_ratio();
+			event->sequential_ratio = calculate_sequential_ratio();
+			event->avg_hits_per_page = calculate_avg_hits_per_page();
+			event->current_policy = current_policy;
+			event->pages_evicted = pages_evicted;
+			event->timestamp = timestamp;
+			bpf_ringbuf_submit(event, 0);
+		}
 	}
 
 	// 주기적으로 정책 전환 체크 (자주 체크)
