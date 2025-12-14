@@ -5,6 +5,9 @@
 CGROUP_PATH="${1:-/sys/fs/cgroup/adaptive_test}"
 WATCH_DIR="${2:-/mydata/adaptive_test_data}"
 
+# Extract cgroup name from path (e.g., /sys/fs/cgroup/adaptive_v2_test -> adaptive_v2_test)
+CGROUP_NAME=$(basename "$CGROUP_PATH")
+
 echo "=================================="
 echo "Adaptive Policy Workload Test"
 echo "=================================="
@@ -33,7 +36,7 @@ echo "=== Workload 1: Sequential Scan (Low Hit Rate) ==="
 echo "Reading all files once (should trigger policy switch)..."
 echo ""
 
-sudo cgexec -g memory:adaptive_test bash -c "
+sudo cgexec -g memory:$CGROUP_NAME bash -c "
     for file in $WATCH_DIR/*; do
         if [ -f \"\$file\" ]; then
             cat \"\$file\" > /dev/null 2>&1
@@ -56,7 +59,7 @@ echo ""
 FIRST_FILE=$(find "$WATCH_DIR" -type f | head -1)
 
 if [ -n "$FIRST_FILE" ]; then
-    sudo cgexec -g memory:adaptive_test bash -c "
+    sudo cgexec -g memory:$CGROUP_NAME bash -c "
         for i in {1..500}; do
             cat \"$FIRST_FILE\" > /dev/null 2>&1
         done
@@ -77,7 +80,7 @@ echo "=== Workload 3: Mixed Pattern ==="
 echo "Alternating between sequential and repeated access..."
 echo ""
 
-sudo cgexec -g memory:adaptive_test bash -c "
+sudo cgexec -g memory:$CGROUP_NAME bash -c "
     for round in {1..3}; do
         echo \"Round \$round: Sequential scan\"
         for file in $WATCH_DIR/*; do
