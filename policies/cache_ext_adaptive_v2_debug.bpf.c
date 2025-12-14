@@ -136,7 +136,11 @@ static inline bool is_folio_relevant(struct folio *folio)
 {
 	if (!folio || !folio->mapping || !folio->mapping->host)
 		return false;
-	return inode_in_watchlist(folio->mapping->host->i_ino);
+	bool is_relevant = inode_in_watchlist(folio->mapping->host->i_ino);
+	if (!is_relevant) {
+		bpf_printk("DEBUG: inode %llu not in watchlist\n", folio->mapping->host->i_ino);
+	}
+	return is_relevant;
 }
 
 static inline struct folio_metadata *get_folio_metadata(struct folio *folio)
@@ -456,6 +460,8 @@ void BPF_STRUCT_OPS(adaptive_v2_debug_folio_added, struct folio *folio)
 {
 	if (!is_folio_relevant(folio))
 		return;
+
+	bpf_printk("DEBUG: folio_added called\n");
 
 	u64 key = (u64)folio;
 	struct folio_metadata meta = {
