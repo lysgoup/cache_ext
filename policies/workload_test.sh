@@ -33,72 +33,80 @@ echo ""
 
 # Workload 1: Sequential scan (히트율 낮음 - 정책 전환 유발)
 echo "=== Workload 1: Sequential Scan (Low Hit Rate) ==="
-echo "Reading all files once (should trigger policy switch)..."
+echo "Reading all files MULTIPLE TIMES to trigger eviction and policy switch..."
 echo ""
 
 sudo cgexec -g memory:$CGROUP_NAME bash -c "
-    for file in $WATCH_DIR/*; do
-        if [ -f \"\$file\" ]; then
-            cat \"\$file\" > /dev/null 2>&1
-        fi
+    echo 'Starting HEAVY sequential scans (20 rounds for eviction)...'
+    for round in {1..20}; do
+        for file in $WATCH_DIR/cold/*.dat $WATCH_DIR/mixed/*.dat; do
+            if [ -f \"\$file\" ]; then
+                cat \"\$file\" > /dev/null 2>&1
+            fi
+        done
     done
+    echo 'Sequential scan complete - eviction should have happened'
 "
 
 echo ""
 echo "✓ Sequential scan complete"
-echo "  Expected: Hit rate should be LOW, may trigger policy switch"
+echo "  Expected: High eviction due to memory limit, policy MUST switch to FIFO"
 echo ""
-sleep 5
+sleep 3
 
-# Workload 2: Repeated reads (히트율 높음 - 정책 유지)
+# Workload 2: Repeated reads (히트율 높음 - 정책 전환 유발)
 echo "=== Workload 2: Repeated Reads (High Hit Rate) ==="
-echo "Reading same files repeatedly (should keep current policy)..."
+echo "Intensively reading SAME files repeatedly to trigger MRU..."
 echo ""
 
-# 첫 번째 파일을 반복적으로 읽기
-FIRST_FILE=$(find "$WATCH_DIR" -type f | head -1)
+# 작은 파일들만 반복적으로 읽기
+FIRST_FILE=$(find "$WATCH_DIR/hot" -type f | head -1)
 
 if [ -n "$FIRST_FILE" ]; then
     sudo cgexec -g memory:$CGROUP_NAME bash -c "
-        for i in {1..500}; do
+        echo 'Starting INTENSIVE repeated access (5000 times)...'
+        for i in {1..5000}; do
             cat \"$FIRST_FILE\" > /dev/null 2>&1
         done
+        echo 'Repeated access complete'
     "
 
     echo ""
     echo "✓ Repeated reads complete"
-    echo "  Expected: Hit rate should be HIGH, policy should remain stable"
+    echo "  Expected: High hit rate, policy should switch to MRU"
     echo ""
 else
     echo "No files found to test"
 fi
 
-sleep 5
+sleep 3
 
 # Workload 3: Mixed pattern
 echo "=== Workload 3: Mixed Pattern ==="
-echo "Alternating between sequential and repeated access..."
+echo "HEAVY mixed pattern - alternating between sequential and repeated access..."
 echo ""
 
 sudo cgexec -g memory:$CGROUP_NAME bash -c "
-    for round in {1..3}; do
-        echo \"Round \$round: Sequential scan\"
-        for file in $WATCH_DIR/*; do
+    echo 'Starting heavy mixed workload (10 rounds)...'
+    for round in {1..10}; do
+        # Sequential scan (cold files)
+        for file in $WATCH_DIR/cold/*.dat; do
             if [ -f \"\$file\" ]; then
                 cat \"\$file\" > /dev/null 2>&1
             fi
         done
 
-        echo \"Round \$round: Repeated access\"
-        for i in {1..100}; do
+        # Repeated access (hot file)
+        for i in {1..200}; do
             cat \"$FIRST_FILE\" > /dev/null 2>&1
         done
     done
+    echo 'Heavy mixed workload complete'
 "
 
 echo ""
 echo "✓ Mixed pattern complete"
-echo "  Expected: Hit rate fluctuates, may trigger multiple policy switches"
+echo "  Expected: Multiple policy switches (FIFO ↔ MRU)"
 echo ""
 
 # 테스트 파일 정리 (임시 파일을 만들었다면)
