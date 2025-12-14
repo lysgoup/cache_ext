@@ -486,6 +486,11 @@ void BPF_STRUCT_OPS(adaptive_v2_debug_folio_added, struct folio *folio)
 	__sync_fetch_and_add(&total_accesses, 1);
 	update_policy_stats(current_policy, false);
 	__sync_fetch_and_add(&timestamp, 1);
+	
+	// DEBUG: folio 추가 이벤트 로깅
+	if ((total_accesses % 50) == 0) {
+		bpf_printk("DEBUG: folio_added total_accesses=%llu\n", total_accesses);
+	}
 }
 
 void BPF_STRUCT_OPS(adaptive_v2_debug_folio_accessed, struct folio *folio)
@@ -583,6 +588,17 @@ void BPF_STRUCT_OPS(adaptive_v2_debug_evict_folios,
 		    struct mem_cgroup *memcg)
 {
 	int ret = 0;
+
+	// 매번 메트릭 출력 (DEBUG) - 10번마다
+	if ((total_accesses % 10) == 0 && total_accesses > 0) {
+		u64 hit_rate = calculate_hit_rate();
+		u64 one_time = calculate_one_time_ratio();
+		u64 seq = calculate_sequential_ratio();
+		u64 avg_hits = calculate_avg_hits_per_page();
+		
+		bpf_printk("DEBUG METRICS [accesses=%llu]: hit_rate=%llu%% one_time=%llu%% seq=%llu%% avg_hits=%llu policy=%d\n",
+			   total_accesses, hit_rate, one_time, seq, avg_hits, current_policy);
+	}
 
 	// 주기적으로 정책 전환 체크 (자주 체크)
 	if ((total_accesses % CHECK_INTERVAL) == 0) {
