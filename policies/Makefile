@@ -1,6 +1,6 @@
 # Define the compiler and the flags
 # See: https://stackoverflow.com/questions/76035116/cannot-use-ebpf-kptr-ref-feature
-CLANG ?= clang-14
+CLANG ?= clang-13
 BPFTOOL ?= /usr/local/sbin/bpftool #../../tools/bpf/bpftool/bpftool
 CFLAGS = -O2 -target bpf -D__TARGET_ARCH_$(ARCH) -c -g -Wall
 USERSPACE_CFLAGS = -O2 -fsanitize=address -g -Wall

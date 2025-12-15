@@ -123,6 +123,19 @@ struct policy_switch_event {
 	u64 old_policy_hit_rate;
 };
 
+
+// ===== 주기적 메트릭 이벤트 (v2_1) =====
+struct metric_event {
+	u64 timestamp;
+	u64 total_accesses;
+	u64 hit_rate;
+	u64 one_time_ratio;
+	u64 sequential_ratio;
+	u64 avg_hits_per_page;
+	u64 avg_reuse_distance;
+	u64 dirty_ratio;
+	u32 current_policy;
+};
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 8192);
@@ -618,17 +631,24 @@ void BPF_STRUCT_OPS(adaptive_v2_1_evict_folios,
 {
 	int ret = 0;
 
-	// 🆕 v2_1: 주기적으로 메트릭 출력 (bpf_printk)
+
+	// 🆕 v2_1: 주기적으로 메트릭을 ring_buffer로 전송
 	if ((total_accesses % METRIC_PRINT_INTERVAL) == 0 && total_accesses > 0) {
-		bpf_printk("[METRICS] accesses=%llu | hit_rate=%llu%% | one_time=%llu%% | seq=%llu%% | avg_hits=%llu | policy=%u | evicted=%llu\n",
-		           total_accesses,
-		           calculate_hit_rate(),
-		           calculate_one_time_ratio(),
-		           calculate_sequential_ratio(),
-		           calculate_avg_hits_per_page(),
-		           current_policy,
-		           pages_evicted);
+		struct metric_event *mevent = bpf_ringbuf_reserve(&events, sizeof(*mevent), 0);
+		if (mevent) {
+			mevent->timestamp = timestamp;
+			mevent->total_accesses = total_accesses;
+			mevent->hit_rate = calculate_hit_rate();
+			mevent->one_time_ratio = calculate_one_time_ratio();
+			mevent->sequential_ratio = calculate_sequential_ratio();
+			mevent->avg_hits_per_page = calculate_avg_hits_per_page();
+			mevent->avg_reuse_distance = calculate_avg_reuse_distance();
+			mevent->dirty_ratio = calculate_dirty_ratio();
+			mevent->current_policy = current_policy;
+			bpf_ringbuf_submit(mevent, 0);
+		}
 	}
+
 
 	// 주기적으로 정책 전환 체크
 	if ((total_accesses % CHECK_INTERVAL) == 0) {
