@@ -36,7 +36,8 @@ CLANG_BPF_SYS_INCLUDES ?= $(shell $(CLANG) -v -E - </dev/null 2>&1 \
 all: 	cache_ext_mru.out cache_ext_mglru.out cache_ext_fifo.out \
 		cache_ext_sampling.out cache_ext_get_scan.out cache_ext_s3fifo.out \
 		cache_ext_lhd.out cache_ext_adaptive.out cache_ext_adaptive_v2.out \
-		cache_ext_adaptive_v2_debug.out cache_ext_adaptive_v3.out \
+		cache_ext_adaptive_v2_debug.out cache_ext_adaptive_v2_1.out \
+		cache_ext_adaptive_v3.out \
 		# cache_ext_debug.out cache_ext_simple.out
 
 $(VMLINUX_H):
