@@ -620,14 +620,13 @@ void BPF_STRUCT_OPS(adaptive_v2_1_evict_folios,
 
 	// 🆕 v2_1: 주기적으로 메트릭 출력 (bpf_printk)
 	if ((total_accesses % METRIC_PRINT_INTERVAL) == 0 && total_accesses > 0) {
-		const char *policy_names[] = {"MRU", "FIFO", "LRU"};
-		bpf_printk("[METRICS] accesses=%llu | hit_rate=%llu%% | one_time=%llu%% | seq=%llu%% | avg_hits=%llu | policy=%s | evicted=%llu\n",
+		bpf_printk("[METRICS] accesses=%llu | hit_rate=%llu%% | one_time=%llu%% | seq=%llu%% | avg_hits=%llu | policy=%u | evicted=%llu\n",
 		           total_accesses,
 		           calculate_hit_rate(),
 		           calculate_one_time_ratio(),
 		           calculate_sequential_ratio(),
 		           calculate_avg_hits_per_page(),
-		           policy_names[current_policy],
+		           current_policy,
 		           pages_evicted);
 	}
 
